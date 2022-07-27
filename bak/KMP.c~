@@ -1,0 +1,72 @@
+//KMP字符串快速查找算法
+void get_next(const char *T, long T_len, int *next)
+{
+    int i, j;
+    i=0;
+    j=-1;
+    next[0]=-1;
+    while (i<T_len)
+    {
+        if (j==-1 || T[i]==T[j])
+        {
+            ++i;
+            ++j;
+            next[i] = j;
+        }
+        else
+        {
+            j= next[j];
+        }
+    }
+}
+void get_nextval(const char *T, long T_len, int *nextval)
+{
+    int i, j;
+    i=0;
+    j=-1;
+    nextval[0]=-1;
+    while (i<T_len)
+    {
+        if (j==-1 || T[i]==T[j])
+        {
+            ++i;
+            ++j;
+            if (T[i]!=T[j])
+                nextval[i]=j;
+            else
+                nextval[i] = nextval[j];
+        }
+        else
+            j= nextval[j];
+    }
+}
+/* 返回子串T在主串S中第pos个字符及其之后的位置。若不存在，则函数返回-1，下标从0开始有效 */
+int Index_KMP(const char *S,const char *T, int pos)
+{
+    long S_len = strlen(S);
+    long T_len = strlen(T);
+    if ( T_len > S_len )
+    {
+        return -1;
+    }
+    int i = pos-1;
+    int j = -1;
+    int next[255];
+    get_nextval(T, T_len, next);
+    while (i < S_len && j < T_len)
+    {
+        if (j == -1 || S[i] == T[j])
+        {
+            ++i;
+            ++j;
+        }
+        else
+        {
+            j = next[j];
+        }
+    }
+    if (j >= strlen(T))
+        return i-strlen(T);
+    else
+        return -1;
+}

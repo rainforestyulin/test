@@ -1,0 +1,51 @@
+	Date		      User
+	 |		       |
+Mon Jul 4 07:32:57 CST 2022   yl
+  1.installed_gcc
+  2.installed_g++
+  3.installed_vim
+Mon Jul 4 07:34:48 CST 2022   yl
+  1.installed_ctags:Tools_of_vim
+Mon Jul 4 07:36:00 CST 2022   yl
+  1.installed_git
+Wed Jul 6 10:36:21 CST 2022   root
+  1.installed_wget
+Wed Jul 6 10:44:00 CST 2022   yl
+  1.installed_rar
+Wed Jul 6 11:19:19 CST 2022   yl
+  1.installed_screen
+Wed Jul 6 11:41:55 CST 2022   root
+  1.installed_python
+Wed Jul 6 11:41:57 CST 2022   root
+  1.installed_python3
+Wed Jul 6 12:13:01 CST 2022   root
+  1.installed_nodejs
+Wed Jul 6 12:14:29 CST 2022   root
+  1.added_packet_neovim
+Thu Jul 7 03:56:19 CST 2022   root
+  1.remove_vimv7
+Thu Jul 7 04:20:52 CST 2022   yl
+  1.maked_and_installed_vim8
+Thu Jul 7 08:06:50 CST 2022   root
+  1.install_npm_http_server
+Thu Jul 7 08:28:18 CST 2022   root
+  1.updated_g++
+Fri Jul 8 05:14:07 CST 2022   root
+  1.installed_clang
+Fri Jul 8 05:18:50 CST 2022   yl
+  1.installed_cmake
+Fri Jul 8 11:24:16 CST 2022   yl
+  1.rebuild_and_install_clang
+Sun Jul 10 05:34:36 CST 2022   yl
+  1.rebuild_and_installed_vim
+Tue Jul 12 13:45:21 CST 2022   root
+  1.install_lib-uuid
+Tue Jul 12 14:06:57 CST 2022   sm
+  1.install_rpm-build
+Wed Jul 13 04:48:31 CST 2022   yl
+  1.OpenSSLv1.0_updated_to_v1.1
+Fri Jul 15 16:07:57 CST 2022   yl
+  1.installed_tcpdump
+Thu Jul 21 07:38:46 CST 2022   yl
+Thu Jul 21 07:39:12 CST 2022   yl
+  1.添加了新功能：使用an命令添加一条或多条便利贴（以空格分割）；使用sn打印所有便利贴

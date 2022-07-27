@@ -1,0 +1,26 @@
+.PHONY:build clean install uninstall
+build:
+	@mkdir bin
+	@g++  -c -w ./src/nas_nt/nas_nt_v1.3.cpp
+	@g++  -w -lpthread ./src/nas_t/nas_t_v1.8.cpp
+	@g++ ./nas_nt_v1.3.o -o ./NAS
+	@rm ./*.o
+	@mv ./a.out ./NAS_MT
+	@mv ./NAS ./bin/
+	@mv ./NAS_MT ./bin/
+#NAS:nas_nt_v1.3.o
+#	@g++ nas_nt_v1.3.o -o NAS
+#	@rm *.o
+#nas_nt_v1.3.o:nas_nt_v1.3.cpp
+#	@g++ -c -w nas_nt_v1.3.cpp
+clean:
+	@rm  -r ./bin/
+	@rm ./*.o
+install:
+	@cp ./bin/NAS /usr/local/bin/
+	@rm ./bin/NAS
+	@cp ./bin/NAS_MT /usr/local/bin/
+	@rm ./bin/NAS_MT
+uninstall:
+	@rm /usr/local/bin/NAS
+	@rm /usr/local/bin/NAS_MT

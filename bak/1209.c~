@@ -1,0 +1,52 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+char bufs[10000]={0};
+char * removeDuplicates(char * s, int k){
+    int len=strlen(s);
+    int i=0;
+    int q=0;
+    int isc=0;
+    char *buf=(char *)malloc(sizeof(char)*len);
+    for(int i=0;i<len;i++){
+        *(buf+i)=*(s+i);
+    }
+    while(*(buf+i)!='\0'){
+        int j=i;
+        int mlen=0;
+        while(*(buf+j)==*(buf+i)&&j<len){
+            mlen++;
+            j++;
+        }
+//        printf("_%d_", mlen);
+        if(mlen>=k){
+            for(int ii=0;ii<mlen-mlen%k;ii++){
+                *(buf+ii+i)='_';
+            }
+            i=i+mlen;
+            isc=1;
+        }else{
+            i=i+mlen;
+        }
+    }
+    i=0;
+    while(*(buf+i)!='\0'){
+        if(*(buf+i)!='_'){
+            bufs[q++]=*(buf+i);
+        }
+        i++;
+    }
+    bufs[q]='\0';
+    free(buf);
+    if(isc==1){
+        removeDuplicates(&bufs[0], k);
+    }
+    else{
+        return &bufs[0];
+    }
+}
+int main(){
+    char *s="deeedbbcccbdaa";
+    printf("%s", removeDuplicates(s, 3));
+    return 0;
+}

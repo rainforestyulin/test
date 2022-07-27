@@ -1,0 +1,21 @@
+#include "flowtree.h"
+//#include "flowtree.cpp"
+#include <iostream>
+int main(){
+    Init_FlowTree(0, 2000,2000 );
+    FlowNode *fl[500000];
+    for(int i=0;i<500000;i++){
+    fl[i]=New_Node();
+    fl[i]->src_addr.v4=i;
+    fl[i]->dst_addr.v4=0;
+    fl[i]->proto=6;
+    fl[i]->src_port=123;
+    fl[i]->dst_port=456;
+ FlowNode * n=Insert_Node(fl[i]);
+    }
+
+if(Lookup_Node(fl[4389])!=NULL){
+    printf("\nfinded_%d\n", fl[4389]->src_addr.v4);
+ }
+    return 0;
+}

@@ -1,0 +1,122 @@
+const char * version="      NAS (Netflow Analysis System) v1.3\n"
+                "      Netflow analysis tool for linux\n";
+const char * notice="       NAS v1.3 for linux:\n";
+static struct link_type{
+	int type;
+	const char *name;
+	int name_len;
+}links[]={
+	{0,"BSD loopback devices, except for later OpenBSD\n",sizeof("BSD loopback devices, except for later OpenBSD")},
+	{1,"Ethernet, and Linux loopback devices\n",sizeof("Ethernet, and Linux loopback devices")},
+	{6,"802.5  Token Ring\n",sizeof("802.5  Token Ring")},
+	{7,"ARCnet\n",sizeof("ARCnet")},
+	{8,"SLIP\n",sizeof("SLIP")},
+	{9,"PPP\n",sizeof("PPP")}
+};
+static struct ICMP_type{
+        int type;
+    	int code;
+        const char *name;
+        int name_len;
+}ICMP_types[]={
+        {0,0,"Echo Reply\n",sizeof("Echo Reply")},
+        {8,0,"Echo\n",sizeof("Echo")},
+        {3,0,"Net Unreachable\n",sizeof("Net Unreachable")},
+        {3,1,"Host Unreachable\n",sizeof("Host Unreachable")},
+        {3,2,"Protocol Unreachable\n",sizeof("Protocol Unreachable")},
+        {3,3,"Port unreachable\n",sizeof("Port unreachable")},
+	{3,4,"Fragmentation Needed, and DF was set\n",sizeof("Fragmentation Needed, and DF was set")},
+	{3,5,"Source route failed\n",sizeof("Source route failed")},
+	{3,6,"Destination network unknown\n",sizeof("Destination network unknown")},
+	{3,7,"Destination host unknown\n",sizeof("Destination host unknown")},
+	{3,8,"Source host isolated\n",sizeof("Source host isolated")},
+	{3,9,"Communication with destination network is administratively prohibited\n",sizeof("Communication with destination network is administratively prohibited")},
+	{3,10,"Communication with destination host is administratively prohibited\n",sizeof("Communication with destination host is administratively prohibited")},
+	{3,11,"Destination network unreachable for type of service\n",sizeof("Destination network unreachable for type of service")},
+	{3,12,"Destination host unreachable for type of service\n",sizeof("Destination host unreachable for type of service")},
+	{3,13,"Communication administratively prohibited\n",sizeof("Communication administratively prohibited")},
+	{3,14,"Host precedence violation\n",sizeof("Host precedence violation")},
+	{3,15,"Precedence cutoff in effect\n",sizeof("Precedence cutoff in effect")},
+	{4,0,"Source shutdown\n",sizeof("Source shutdown")},
+	{5,0,"Redirect datagram for the network (or subnet)\n",sizeof("Redirect datagram for the network (or subnet)")},
+	{5,1,"Redirect datagram for the host\n",sizeof("Redirect datagram for the host")},
+	{5,2,"Redirect datagram for the type of service and network\n",sizeof("Redirect datagram for the type of service and network")},
+	{5,3,"Redirect datagram for the type of service and host\n",sizeof("Redirect datagram for the type of service and host")},
+};
+static struct MAC_P_type{
+	unsigned int type;
+	const char *name;
+	int name_len;
+}MAC_types[]{
+	{0x0800,"IPv4\n",sizeof("IPv4")},
+	{0x86DD,"IPv6\n",sizeof("IPv6")},
+	{0x0806,"Address Resolution Protocol\n",sizeof("Address Resolution Protocol")},
+	{0x0808,"Frame Relay ARP\n",sizeof("Frame Relay ARP")},
+	{0x8035,"RARP\n",sizeof("RARP")}
+};
+static struct IP_p_type{
+        unsigned char type;
+        const char *name;
+        int name_len;
+}IP_types[]={
+	{0x6,"TCP\n",sizeof("TCP")},
+    {0x11,"UDP\n",sizeof("UDP")},
+	{0x01,"ICMP\n",sizeof("ICMP")}
+};
+static struct Trans_type{
+    const char *name;
+    int name_len;
+}trans[]={
+    {"HTTP\n",sizeof("HTTP")},
+    {"DHCP\n", sizeof("DHCP")},
+    {"DNS\n", sizeof("DNS")},
+    {"MQTT\n", sizeof("MQTT")}
+};
+#define MAC_type_num (sizeof(MAC_types)/sizeof(MAC_types[0]))
+#define link_num (sizeof(links)/sizeof(links[0]))
+#define IP_num (sizeof(IP_types)/sizeof(IP_types[0]))
+#define ICMP_num (sizeof(ICMP_types)/sizeof(ICMP_types[0]))
+
+static struct Proto{
+    const char *name;
+    void *addr;
+    unsigned int num;
+}protos[]={
+    {"Data link layer",&links[0],link_num}, 
+    {"Network layer", &MAC_types[0], MAC_type_num}, 
+    {"Transport layer", &IP_types[0], IP_num}, 
+    {"Application layer", &trans[0], 4}
+};
+const char* v5format="+----------+----------+----------+----------+----------+----------+----------+----------+\n"
+                     "|                  srcaddr                  |                  dstaddr                  |\n"
+                     "+---------------------------------------------------------------------------------------+\n"
+                     "|                  nexthop                  |        input        |        output       |\n"
+                     "+---------------------------------------------------------------------------------------+\n"
+                     "|                   dPkts                   |                  dOctets                  |\n"
+                     "+---------------------------------------------------------------------------------------+\n"
+                     "|                   First                   |                   Last                    |\n"
+                     "+---------------------------------------------------------------------------------------+\n"
+                     "|       srcport       |       dstport       |  version | tcp_flags|   prot   |   tos    |\n"
+                     "+---------------------------------------------------------------------------------------+\n"
+                     "|        src_as       |        dst_as       | src_mask | dst_mask |       flow_id       |\n"
+                     "+----------+----------+----------+----------+----------+----------+----------+----------+\n";
+
+
+const char * resformat="+-------------------------------------------+\n"
+                       "|        Captured Time & Data Length        |\n"
+                       "+-------------------------------------------+\n"
+                       "|           Data Link Layer Data            |\n"
+                       "+-------------------------------------------+\n"
+                       "|            NetWork Layer Data             |\n"
+                       "+-------------------------------------------+\n"
+                       "|           Transport Layer Data            |\n"
+                       "+-------------------------------------------+\n"
+                       "|          Application Layer Data           |\n"
+                       "+-------------------------------------------+\n";
+
+
+
+
+
+
+

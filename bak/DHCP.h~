@@ -1,0 +1,226 @@
+#include <string>
+#include <map>
+#include <sstream>
+#include <iostream>
+
+using namespace std;
+extern void get_byte(char onebyte, char* sav_addr);
+extern unsigned int get_2bytes(unsigned char* addr);//huo qu addr qi liang ge byte de zhi 
+extern unsigned int get_int(unsigned char* addr);//4
+extern unsigned int get_int_rev(unsigned char* addr);//4
+extern void val_u_deal_tool(unsigned int val, char* c, int* buf_nr_p);
+extern void val_deal_tool(int val, char* c, int* buf_nr_p);
+
+
+class DHCP {
+private:
+    ofstream* of;
+    enum parts {
+        op_code,
+        hardwareAddr_type,
+        hardwareAddr_length,
+        hops,
+        transsaction_ID,
+        seconds_since_start,
+        flags,
+        CIP_knowedby_client,
+        CIP_givenby_server,
+        SIP,
+        GIP,
+        Chardware_addr,
+
+    };
+public:
+    DHCP(unsigned char* buf, ofstream* of);
+    ~DHCP();
+};
+
+
+
+DHCP::DHCP(unsigned char* msg, ofstream* of) {
+    this->of = of;
+
+    parts part = op_code;
+    unsigned int hardAdrrLen = 0;
+    int turn = 0;
+    string tmp = {};
+    unsigned int val = 0;
+    int len = 0;
+    char a[20] = { 0 };
+    int npart = 0;
+    int end = 0;
+    of->write("\n", 1);
+    for (int c = 0;; c++) {
+        if (end == 1) break;
+        switch (part)
+        {
+        case op_code:
+            //npart = 0;
+        case hardwareAddr_type:
+            //if(npart >= 0) npart = 1;
+        case hardwareAddr_length:
+            //if(npart >= 0) npart = 2;
+        case hops:
+        {
+            //if (npart >= 0) npart = 3;
+            val = *(msg + c) & 0x000000ff;
+            val_deal_tool(val, a, &len);
+            if(npart == 0) of->write("Operation:", 10);
+            else if (npart == 1) of->write("Hardware Address Type:", 22);
+            else if (npart == 2) {
+                of->write("Hardware Address Length:", 24);
+                hardAdrrLen = val;
+            }
+            else if (npart == 3) of->write("Hops:", 5);
+            of->write(a, len);
+            of->write("\n",1);
+            len = 0;
+            val = 0;
+            npart++;
+            turn = 0;
+            tmp = {};
+            if (npart == 1) part = hardwareAddr_type;
+            else if (npart == 2) part = hardwareAddr_length;
+            else if (npart == 3) part = hops;
+            else {
+                npart = 0;
+                part = transsaction_ID;
+               // cout << "turn to transsaction_ID"  << endl;
+            }
+            break;
+        }
+        
+       
+        case transsaction_ID:
+        {
+            int len1 = 4;
+            if (turn < len1)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            //cout << "turn" << turn << endl;
+            if (len1 <= turn) {
+                //cout << "in len1<=turn";
+                of->write("Transsaction ID:", 16);
+                of->write("0x", 2);
+                const char* tempp = tmp.c_str();
+                for (int i = 0; i < tmp.length(); i++) {
+                    get_byte(*(tempp + i), &a[0]);
+                    of->write(&a[0], 2);
+                }
+                of->write("\n", 1);
+                part = seconds_since_start;
+                npart = 0;
+                tmp = {};
+                turn = 0;
+            }
+            break;
+        }
+        case seconds_since_start:
+        case flags:
+        {
+            int len1 = 2;
+            if (turn < len1)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            if (len1 <= turn) {
+                if (npart == 0) of->write("Seconds Since DHCP Start:", 25);
+                else if (npart == 1) of->write("Flags:", 6);
+                const char* tempp = tmp.c_str();
+                //cout << "tmp" << (int)*tempp<<"  " << (int)*(tempp + 1) << endl;
+                val = get_2bytes((unsigned char*)tempp);
+                //cout << "val" << val << endl;
+                len = 0;
+                val_deal_tool(val, a, &len);
+                //cout << "a" << a[0]<<a[1] << " len:" << len << endl;
+                of->write(a, len);
+                of->write("\n", 1);
+                npart++;
+                if (npart == 1) part = flags;
+                else if (npart == 2) {
+                    part = CIP_knowedby_client;
+                    npart = 0;
+                }
+                len = 0;
+                val = 0;
+                tmp = {};
+                turn = 0;
+            }
+            break;
+        }
+        
+        case CIP_knowedby_client:
+        case CIP_givenby_server:
+        case SIP:
+        case GIP:
+        {
+            int len1 = 4;
+            if (turn == 0) {
+               if(npart == 0) of->write("IP Address Known By Client:", 27);
+               else if(npart == 1) of->write("Client IP Address Given By Server:", 34);
+               else if (npart == 2) of->write("Server IP Address:", 18);
+               else if (npart == 3) of->write("Gateway IP Address:", 19);
+            }
+            if (turn < len1)
+            {
+                val = (*(msg + c)) & 0x000000ff;
+                len = 0;
+                val_deal_tool(val, a, &len);
+                //cout << "val" << val << "len" << len << endl;
+                of->write(a, len);
+                if (turn != len1 - 1) {
+                    of->write(".", 1);
+                }
+                turn++;
+            }
+            if (len1 <= turn) {
+                of->write("\n", 1);
+                npart++;
+                if (npart == 1) part = CIP_givenby_server;
+                else if (npart == 2) part = SIP;
+                else if (npart == 3) part = GIP;
+                else if (npart == 4) {
+                    part = Chardware_addr;
+                    npart = 0;
+                }
+                len = 0;
+                val = 0;
+                tmp = {};
+                turn = 0;
+            }
+            break;
+        }
+     
+        case Chardware_addr:
+        {
+            int len1 = 16;
+            if (turn == 0)  of->write("Client Hardware Addr:", 21); 
+            cout << "turn" << turn << endl;
+            if (turn < hardAdrrLen)
+            {
+                get_byte(*(msg + c), &a[0]);
+                of->write(&a[0], 2);
+                cout << "a[0]" << a[0]<<a[1] << endl;
+                if (turn != hardAdrrLen - 1) {
+                    of->write(":", 1);
+                }
+            }
+            turn++;
+            if (len1 <= turn) {
+                tmp = {};
+                turn = 0;
+                end = 1;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+DHCP::~DHCP() {}
+

@@ -1,0 +1,857 @@
+#include <string>
+#include <map>
+#include <sstream>
+#include <iostream>
+using namespace std;
+extern void get_byte(char onebyte, char* sav_addr);
+void get_2byte_asc(const char* onebyte, char* sav_addr, int* length);
+extern unsigned int get_2bytes(unsigned char* addr);//huo qu addr qi liang ge byte de zhi 
+extern unsigned int get_int(unsigned char* addr);//4
+extern unsigned int get_int_rev(unsigned char* addr);//4
+extern void val_u_deal_tool(unsigned int val, char* c, int* buf_nr_p);
+extern void val_deal_tool(int val, char* c, int* buf_nr_p);
+
+void get_2byte_asc(const char* start_addr, char* sav_addr, int* length) {
+    char a[10];
+    *length = 4;
+    get_byte(*start_addr, a);
+    get_byte(*(start_addr+1), a+2);
+    if (a[0] == '0') (*length)--;
+    if (a[0] == '0' && a[1] == '0') (*length)--;
+    if (a[0] == '0' && a[1] == '0' && a[2] == '0') (*length)--;
+    int j = 4 - (*length);
+    for (int i = 0;i < (*length);i++) {
+        *(sav_addr + i) = a[j];
+        j++;
+    }
+}
+
+enum DNS_parts {
+    DNS_transsaction_ID,
+    DNS_flags,
+    questions,
+    answer_rrs,
+    authority_rrs,
+    additional_rrs,
+    queries,
+    answers,
+    authoritative_nameservers,
+    additional_records
+};
+
+
+class DNS {
+private:
+    //map<string, DNS_group> dns;
+    ofstream* of;
+    unsigned int gQuestionLen;
+    unsigned int gAnswerLen;
+    unsigned int gAuthorLen;
+    unsigned int gAdditonLen;
+    unsigned char* gmsg;
+public:
+    
+    DNS(unsigned char* buf, ofstream* of);
+    ~DNS();
+    //void show();
+    void quote(int i);
+    int writeType(unsigned int val);
+    void writeClass(unsigned int val);
+    void writeIP(char* tempp, int* offset);
+};
+void DNS::quote(int i) {
+    unsigned char* msg = gmsg;
+    for (; (int)*(msg + i) != 0; i++) {
+        int ver = ((int)*(msg + i)) & 0x000000ff;
+        if (ver == 192) {
+            i += 1;
+            int j = (((int)*(msg + i)) & 0x000000ff);
+            quote(j);
+            break;
+        }
+        else {
+            if ((int)*(msg + i) < 32 || (int)*(msg + i) > 126) of->write(".", 1);
+            else of->write((char*)(msg + i), 1);
+        }
+    }
+    return;
+}
+int DNS::writeType(unsigned int val) {
+    switch (val)
+    {
+    case 1: {
+        of->write("A", 1);
+        break;
+    }
+    case 2: {
+        of->write("NS", 2);
+        break;
+    }
+    case 3: {
+        of->write("MD", 2);
+        break;
+    }
+    case 4: {
+        of->write("MF", 2);
+        break;
+    }
+    case 5: {
+        of->write("CNAME", 5);
+        break;
+    }
+    case 6: {
+        of->write("SOA", 3);
+        break;
+    }
+    case 7: {
+        of->write("MB", 2);
+        break;
+    }
+    case 8: {
+        of->write("MG", 2);
+        break;
+    }
+    case 9: {
+        of->write("MR", 2);
+        break;
+    }
+    case 10: {
+        of->write("NULL", 4);
+        break;
+    }
+    case 11: {
+        of->write("WKS", 3);
+        break;
+    }
+    case 12: {
+        of->write("PTR", 3);
+        break;
+    }
+    case 13: {
+        of->write("HINFO", 5);
+        break;
+    }
+    case 14: {
+        of->write("MINFO", 5);
+        break;
+    }
+    case 15: {
+        of->write("MX", 2);
+        break;
+    }
+    case 16: {
+        of->write("TXT", 2);
+        break;
+    }
+    case 28: {
+        of->write("AAAA", 4);
+        break;
+    }
+    case 100: {
+        of->write("UINFO", 5);
+        break;
+    }
+    case 101: {
+        of->write("UID", 3);
+        break;
+    }
+    case 102: {
+        of->write("GID", 3);
+        break;
+    }
+    case 255: {
+        of->write("ANY", 3);
+        break;
+    }
+    default: {
+        of->write("OPT(", 4);
+        char a[10];
+        int len = 0;
+        val_deal_tool(val, a, &len);
+        of->write(a, len);
+        of->write(")", 1);
+        return len;
+        //cout << "this queries name is going to include" << endl;
+    }
+    }
+    return 0;
+}
+void DNS::writeClass(unsigned int val) {
+    switch (val)
+    {
+    case 1: {
+        of->write("IN", 2);
+        break;
+    }
+    case 2: {
+        of->write("CSNET", 5);
+        break;
+    }
+    case 3: {
+        of->write("CHAOS", 5);
+        break;
+    }
+    case 4: {
+        of->write("HESIOD", 6);
+        break;
+    }
+    case 255: {
+        of->write("ANY", 3);
+        break;
+    }
+    default: {
+        of->write("OPT(", 4);
+        char a[10];
+        int len = 0;
+        val_deal_tool(val, a, &len);
+        of->write(a, len);
+        of->write(")", 1);
+        //cout << "this add class is going to include" << endl;
+    }
+    }
+}
+void DNS::writeIP(char* tempp,int *offset) {
+    int f = 1;
+    for (;; (*offset)++) {
+        int ver = ((int)*(tempp + (*offset))) & 0x000000ff;
+        if (ver != 192 && ver != 0)
+        {
+            if (f == 1) (*offset)++;
+            f = 0;
+            if (*(tempp + (*offset)) < 32 || *(tempp + (*offset)) > 126) of->write(".", 1);
+            else of->write(tempp + (*offset), 1);
+        }
+        else if (ver == 192) {
+            (*offset) += 1;
+            int i = (((int)*(tempp + (*offset))) & 0x000000ff) + 1;
+            if (f == 0) i--;
+            quote(i);
+            (*offset) += 1;
+
+            break;
+        }
+        else {
+            (*offset) += 1;
+            break;
+        }
+    }
+}
+
+DNS::DNS(unsigned char* msg, ofstream* of) {
+    
+    gmsg = msg;
+    this->of = of;
+    DNS_parts part = DNS_transsaction_ID;
+    int turn = 0;
+    string tmp = {};
+    int end = 0;
+    int dlen = 0;
+    char a[20] = {0};
+    int npart = 0;
+    unsigned int val = 0;
+    unsigned int QuestionLen=0;
+    unsigned int AnswerLen=0;
+    unsigned int AuthorLen=0;
+    unsigned int AdditonLen=0;
+    gQuestionLen = QuestionLen;
+    gAnswerLen = AnswerLen;
+    gAuthorLen = AuthorLen;
+    gAdditonLen = AdditonLen;
+    int alen = 0;
+    of->write("\n", 1);
+    for (int c = 0;; c++) {
+        if (end == 1) break;
+        switch (part)
+        {
+        case DNS_transsaction_ID:
+        case DNS_flags:
+        case questions:
+        case answer_rrs:
+        case authority_rrs:
+        case additional_rrs:
+        {
+            
+            int len = 2;
+            if (turn < len)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            if (len <= turn) {
+                const char* tempp = tmp.c_str();
+                if (npart == 0) {
+                    of->write("Transsaction ID:0x", 18);//dns.insert(make_pair("Transsaction ID", make_group(tmp, part)));
+                    get_byte(*tempp, a);
+                    //cout << "val" << val << "len" << len << endl;
+                    of->write(a, 2);
+                }
+                else if (npart == 1) {
+                    of->write("Flags:0x", 8);
+                    get_byte(*tempp, a);
+                    //cout << "val" << val << "len" << len << endl;
+                    of->write(a, 2);
+                    of->write("\n", 1);
+                    int record = (int)(((*tempp) & 0x80) >> 7);
+                    cout << "record:" << record << endl;
+                    of->write("  Response(QR):", 15);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x40)>> 6);
+                    of->write("  Opcode:", 9);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x20) >> 5);
+                    of->write("  Authoritative(AA):", 20);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x10) >> 4);
+                    of->write("  Truncated(TC):", 16);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x08) >> 3);
+                    of->write("  Recursion desired(RD):", 24);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x04) >> 2);
+                    of->write("  Recursion available(RA):", 26);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)(((*tempp) & 0x02) >> 1);
+                    of->write("  Z(zero):", 10);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    of->write("\n", 1);
+
+                    record = (int)((*tempp) & 0x01);
+                    of->write("  Reply code(rcode):", 20);
+                    len = 0;
+                    val_deal_tool(record, a, &len);
+                    of->write(a, len);
+                    //of->write("\n", 1);
+                }
+                else if (npart == 2) {
+                    of->write("Questions:", 10);
+                    QuestionLen = get_2bytes((unsigned char*)tempp);
+                    gQuestionLen = QuestionLen;
+                    val_deal_tool(QuestionLen, a, &dlen);
+                    of->write(a, dlen);
+                }
+                else if (npart == 3){
+                    of->write("Answer RRs:", 11);
+                    AnswerLen = get_2bytes((unsigned char*)tempp);
+                    gAnswerLen = AnswerLen;
+                    val_deal_tool(AnswerLen, a, &dlen);
+                    of->write(a, dlen);
+                }
+                else if (npart == 4){
+                    of->write("Authority RRs:", 14);
+                    AuthorLen = get_2bytes((unsigned char*)tempp);
+                    gAuthorLen = AuthorLen;
+                    val_deal_tool(AuthorLen, a, &dlen);
+                    of->write(a, dlen);
+
+                }
+                else if (npart == 5) {
+                    of->write("Additional RRs:", 15);
+                    AdditonLen = get_2bytes((unsigned char*)tempp);
+                    gAdditonLen = AdditonLen;
+                    val_deal_tool(AdditonLen, a, &dlen);
+                    of->write(a, dlen);
+                }
+                of->write("\n", 1);
+                npart++;
+                
+                if (npart == 1) part = DNS_flags;
+                else if (npart == 2) part = questions;
+                else if (npart == 3) part = answer_rrs;
+                else if (npart == 4) part = authority_rrs;
+                else if (npart == 5) part = additional_rrs;
+                else if (QuestionLen != 0) part = queries;
+                else if (AnswerLen != 0) {
+                    part = answers;
+                    npart = 0;
+                }
+                else if (AuthorLen != 0) {
+                    part = authoritative_nameservers;
+                    npart = 0;
+                }
+                else if (AdditonLen != 0) {
+                    part = additional_records;
+                    npart = 0;
+                }
+                else end = 1;
+                tmp = {};
+                turn = 0;
+                dlen = 0;
+                val = 0;
+                //npart = 0;
+
+            }
+            break;
+        }
+        
+       
+        case queries:
+        {
+            
+            int len = 5;
+            int f = 0;
+            if ((int)*(msg + c) != 0 && turn == 0)
+            {
+                tmp.push_back(*(msg + c));
+                f = 1;
+            }
+            if (f == 0 && turn < len)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            if (turn == len) {
+                if(QuestionLen>0) QuestionLen--;
+                if (QuestionLen != 0)
+                {
+                    part = queries;
+                    turn = 0;
+                }
+                else{
+                    int qlen = gQuestionLen;
+                    const char* tempp = tmp.c_str();
+                    of->write("Queries:", 8);
+                    int qend = 1;
+                    int offset = 0;
+                    while (qend) {
+                        of->write("\n", 1);
+                        of->write("  Name:", 7);
+                        
+                        for (int i = 1; i < tmp.length(); i++) {
+                            if ((int)*(tempp + i) != 0)
+                            {
+                                if (*(tempp + i) < 32 || * (tempp + i) > 126) of->write(".", 1);
+                                else of->write(tempp + i, 1);
+                            }
+                            else {
+                                offset = i + 1;
+                                break;
+                            }
+                        }
+                        of->write("\n", 1);
+                        of->write("  Type:", 7);
+                        val = val + *(tempp + offset + 1);
+                        val = val + ((*(tempp + offset)) << 8);
+                        writeType(val);
+                        of->write("\n", 1);
+                        offset += 2;
+                        val = 0;
+                        val = val + *(tempp + offset + 1);
+                        val = val + ((*(tempp + offset)) << 8);
+                        of->write("  Class:", 8);
+                        writeClass(val);
+                        offset += 2;
+                        qlen--;
+                        if (qlen != 0) {
+                            tempp += offset;
+                            offset = 0;
+                        }
+                        else qend = 0;
+                    }
+                    
+                }
+                of->write("\n", 1);
+                if (AnswerLen != 0) {
+                    part = answers;
+                    alen = AnswerLen;
+                }
+                else if (AuthorLen != 0) {
+                    part = authoritative_nameservers;
+                    alen = AuthorLen;
+                }
+                else if (AdditonLen != 0) {
+                    part = additional_records;
+                    alen = AdditonLen;
+                }
+                else end = 1;
+                //end = 1;
+                tmp = {};
+                turn = 0;
+                dlen = 0;
+                val = 0;
+                npart = 0;
+                //alen = 0;
+            }
+            break;
+        }
+        /*case queries_type:
+        {
+            int len = 2;
+            if (turn < len)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            if (verify[7] == 0 && len <= turn) {
+                dhcp.insert(make_pair("Type", make_group(tmp, part)));
+                verify[7] = 1;
+                part = queries_class;
+                tmp = {};
+                turn = 0;
+            }
+            break;
+        }
+        case queries_class:
+        {
+            int len = 2;
+            if (turn < len)
+            {
+                tmp.push_back(*(msg + c));
+                turn++;
+            }
+            if (verify[7] == 0 && len <= turn) {
+                dhcp.insert(make_pair("Name", make_group(tmp, part)));
+                verify[7] = 1;
+                part = queries_class;
+                tmp = {};
+                turn = 0;
+            }
+            break;
+        }
+        */
+        
+        
+        case answers:
+        case authoritative_nameservers:
+        case additional_records:
+        {    
+            if (turn == 0) {
+                int offset = (*(msg + c)) & 0x000000ff;
+                if (offset == 0) {
+                    tmp = " <Root>";
+                    char b[1] = { 0 };
+                    tmp.push_back(b[0]);
+                    c += 1;
+                    //cout << "msg+c" << (int)(*(msg + c)) << endl;
+                }
+                else if (offset != 192) {
+                    //c += 1;
+                    int offset = (*(msg + c)) & 0x000000ff;
+                    while (offset != 0 && offset != 192)
+                    {
+                        tmp.push_back(*(msg + c));
+                        c += 1;
+                        offset = (*(msg + c)) & 0x000000ff;
+                    }
+                    if (offset == 192) {
+                        tmp.push_back(*(msg + c));
+                        tmp.push_back(*(msg + c + 1));
+                        c += 2;
+                    }
+                }
+                else {
+                    tmp.push_back(*(msg + c));
+                    tmp.push_back(*(msg + c + 1));
+                    c += 2;
+                }
+                turn = 1;
+            }
+            
+            if (turn != 0) {
+                int len = 11;
+                if (turn < len) {
+                    tmp.push_back(*(msg + c));
+                    turn++;
+                }
+                if (turn == len) {
+                    val = val + *(msg + c);
+                    val = val + ((*(msg + c - 1)) << 8);
+                    while (val) {
+                        c++;
+                        tmp.push_back(*(msg + c));
+                        val--;
+                    }
+                    alen--;
+                    if (alen != 0) {
+                        turn = 0;
+                    }
+                }
+            }
+            
+            //cout << part << "is running" << endl;
+            //cout << "alen:" << alen << endl;
+            if (alen == 0) {
+                if (part == 7) of->write("Anwsers:", 8);//dns.insert(make_pair("Transsaction ID", make_group(tmp, part)));
+                else if (part == 8) of->write("Authoritative nameservers:", 26);
+                else if (part == 9) of->write("Additional records:", 19);
+                int aend = 1;
+                const char* tempp = tmp.c_str();
+
+                while (aend) {
+                    of->write("\n", 1);
+                    of->write("  Name:", 7);
+                    int offset = 0;
+                    //offset -= 1;
+                    writeIP((char*)tempp, &offset);
+                    of->write("\n", 1);
+                    of->write("  Type:", 7);
+                    val = get_2bytes((unsigned char*)(tempp + offset));
+                    int type_ = val;
+                    alen = 0;
+                    alen = writeType(val);
+                    of->write("\n", 1);
+                    offset += 2;
+                    if (alen == 0) {
+                        val = 0;
+                        val = val + *(tempp + offset + 1);
+                        val = val + ((*(tempp + offset)) << 8);
+                        of->write("  Class:", 8);
+                        writeClass(val);
+                        
+                        offset += 2;
+                        of->write("\n", 1);
+                        val = get_int((unsigned char*)tempp + offset);
+                        of->write("  TTL:", 6);
+                        alen = 0;
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+                        of->write("\n", 1);
+                        offset += 4;
+                        alen = 0;
+                        of->write("  Data length:", 14);
+                        val = get_2bytes((unsigned char*)(tempp + offset));
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+                        of->write("\n", 1);
+                        offset += 2;
+                        switch (type_)
+                        {
+                        case 1: {
+                            of->write("  Address:", 10);
+                            for (int i = 0; i < 4; i++) {
+                                val = (*(tempp + offset + i)) & 0x000000ff;
+                                alen = 0;
+                                val_deal_tool(val, a, &alen);
+                                of->write(a, alen);
+                                if (i != 3) {
+                                    of->write(".", 1);
+                                }
+                            }
+                            offset += 4;
+                            break;
+                        }
+                        case 2: {
+                            of->write("  Name Server:", 14);
+                            writeIP((char*)tempp, &offset);
+                            
+                            break;
+
+                        }
+                        case 5: {
+                            of->write("  CNAME:", 8);
+                            writeIP((char*)tempp, &offset);
+                            
+                            break;
+                        }
+                        case 6: {
+                            of->write("  Primary name server:", 22);
+                            writeIP((char*)tempp, &offset);
+                            
+                            of->write("\n", 1);
+                            of->write("  Responsible authority's mailbox:", 34);
+                            writeIP((char*)tempp, &offset);
+                            
+                            of->write("\n", 1);
+                            of->write("  Serial Number:", 16);
+                            val = get_int((unsigned char*)tempp + offset);
+                            alen = 0;
+                            val_deal_tool(val, a, &alen);
+                            of->write(a, alen);
+                            of->write("\n", 1);
+                            offset += 4;
+
+                            of->write("  Refresh Interval:", 19);
+                            val = get_int((unsigned char*)tempp + offset);
+                            alen = 0;
+                            val_deal_tool(val, a, &alen);
+                            of->write(a, alen);
+                            of->write("\n", 1);
+                            offset += 4;
+
+                            of->write("  Retry Interval:", 17);
+                            val = get_int((unsigned char*)tempp + offset);
+                            alen = 0;
+                            val_deal_tool(val, a, &alen);
+                            of->write(a, alen);
+                            of->write("\n", 1);
+                            offset += 4;
+
+                            of->write("  Expire limit:", 15);
+                            val = get_int((unsigned char*)tempp + offset);
+                            alen = 0;
+                            val_deal_tool(val, a, &alen);
+                            of->write(a, alen);
+                            of->write("\n", 1);
+                            offset += 4;
+
+                            of->write("  Minimum TTL:", 14);
+                            val = get_int((unsigned char*)tempp + offset);
+                            alen = 0;
+                            val_deal_tool(val, a, &alen);
+                            of->write(a, alen);
+                            offset += 4;
+                            //of->write("SOA", 3);
+                            break;
+                        }
+                        case 12: {
+                            //of->write("PTR", 3);
+                            break;
+                        }
+                        case 28: {
+                            of->write("  AAAA Address:", 15);
+                            for (int i = 0; i < 16; i += 2) {
+                                alen = 0;
+
+                                get_2byte_asc(tempp + offset + i, a, &alen);
+                                of->write(&a[0], alen);
+                                if (i != 14) {
+                                    of->write(":", 1);
+                                }
+                            }
+                            offset += 16;
+                            break;
+                            //of->write("AAAA", 5);
+                            break;
+                        }
+                        default:
+                            offset += val;
+                            cout << "This type is going to include" << endl;
+                        }
+
+                    }
+                    else if (val == 41) {
+                        val = 0;
+                        val = val + *(tempp + offset + 1);
+                        val = val + ((*(tempp + offset)) << 8);
+                        of->write("  UDP playload size:", 20);
+                        alen = 0;
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+                        of->write("\n", 1);
+                        offset += 2;
+                        of->write("  Higher bits in extended RCODE:0x", 34);
+                        get_byte(*(tempp + offset), &a[0]);
+                        of->write(&a[0], 1);
+                        of->write("\n", 1);
+                        offset += 1;
+                        alen = 0;
+                        of->write("  EDNS0 version:", 16);
+                        val = (*(tempp + offset)) & 0x000000ff;
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+                        of->write("\n", 1);
+                        offset += 1;
+                        alen = 0;
+                        of->write("  Z:", 4);
+                        val = get_2bytes((unsigned char*)(tempp + offset));
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+                        of->write("\n", 1);
+                        offset += 2;
+                        alen = 0;
+                        of->write("  Data Length:", 14);
+                        val = get_2bytes((unsigned char*)(tempp + offset));
+                        val_deal_tool(val, a, &alen);
+                        of->write(a, alen);
+
+                        offset += 2;
+                    }
+                    switch (part) {
+                    case answers: {
+                        AnswerLen--;
+                        cout << "Answerlen" << AnswerLen << endl;
+                        cout << "AdditonLen" << AdditonLen << endl;
+                        if (AnswerLen != 0) {
+                            cout << "running" << endl;
+                            of->write("\n", 1);
+                            tempp += offset;
+                            offset = 0;
+                            alen = 0;
+                        }
+                        else aend = 0;
+                        break;
+                    }
+                    case authoritative_nameservers: {
+                        AuthorLen--;
+                        if (AuthorLen != 0) {
+                            of->write("\n", 1);
+                            tempp += offset;
+                            offset = 0;
+                            alen = 0;
+                        }
+                        else aend = 0;
+                        break;
+                    }
+
+                    case additional_records: {
+                        AdditonLen--;
+                        if (AdditonLen != 0) {
+                            of->write("\n", 1);
+                            tempp += offset;
+                            offset = 0;
+                            alen = 0;
+                        }
+                        else aend = 0;
+                        break;
+                    }
+
+                    }
+                }
+                if (AuthorLen != 0) {
+                    of->write("\n", 1);
+                    part = authoritative_nameservers;
+                    alen = AuthorLen;
+                    //npart = 1;
+                }
+                else if (AdditonLen != 0) {
+                    of->write("\n", 1);
+                    part = additional_records;
+                    alen = AdditonLen;
+                    //npart = 2;
+                }
+                else end = 1;
+                tmp = {};
+                turn = 0;
+                dlen = 0;
+                val = 0;
+                //alen = 0;
+            }
+            break;
+        }
+        
+        
+        default:
+            break;
+        }
+    }
+}
+
+DNS::~DNS() {}
+
+
+

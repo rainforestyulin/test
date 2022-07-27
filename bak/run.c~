@@ -1,0 +1,12 @@
+#include "fast_accumulate.c"
+#include <assert.h>
+#include <stdlib.h>
+int main(){
+    int i=0;
+    int sum=0;
+/*    for (;i<=100000;i++){
+        sum=sum+i;
+    }*/
+    printf("%di_%d", sum, fast_accumulate(100000));
+    return 0;
+}

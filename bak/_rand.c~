@@ -1,0 +1,9 @@
+#include <stdlib.h>
+#include <time.h>
+#include "rand_a2b.h"
+/* 产生[a, b]之间的随机数，返回值为int型 */
+int randa2b(int a, int b)
+{
+    srand((unsigned)time(NULL));
+    return a+rand()%(b-a+1);
+}

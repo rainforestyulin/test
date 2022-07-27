@@ -1,0 +1,78 @@
+void val_deal(int val,char *c,int *maxdepth_p,int *buf_nr_p){
+        int depth=0;
+        int tempp=10;
+        int temp=val;
+        while(temp>=10){
+                temp=temp/10;
+                depth++;
+        }
+        if(*maxdepth_p==-1){
+                (*maxdepth_p)=depth;
+                for(int i=*(buf_nr_p);i<=*(buf_nr_p)+depth;i++){
+                    *(c+i)='0';
+                }
+        }
+        *(c+*(buf_nr_p)+*maxdepth_p-depth)=temp+48;
+        for(int i=0;i<depth-1;i++){
+                tempp=tempp*10;
+        };
+        if((val-temp*tempp)>0){
+                val_deal(val-temp*tempp,c,maxdepth_p,buf_nr_p);
+        }else{
+		
+	}
+};
+void val_deal_tool(int val,char *c,int *buf_nr_p){
+        *buf_nr_p=0;
+        int t_maxdepth=-1;
+        if(val>=0){
+                val_deal(val,c,&t_maxdepth,buf_nr_p);
+                *buf_nr_p=*buf_nr_p+t_maxdepth+1;
+        }else{
+                *(c+*buf_nr_p)='-';
+                (*buf_nr_p)++;
+                val_deal(-val,c,&t_maxdepth,buf_nr_p);
+                *buf_nr_p=*buf_nr_p+t_maxdepth+2;
+        }
+ 
+}
+void val_u_deal(unsigned int val,char *c,int *maxdepth_p,int *buf_nr_p){
+	int depth=0;
+        unsigned int tempp=10;
+        unsigned int temp=val;
+        while(temp>=10){
+                temp=temp/10;
+                depth++;
+        }
+        if(*maxdepth_p==-1){
+                (*maxdepth_p)=depth;
+                for(int i=*(buf_nr_p);i<=*(buf_nr_p)+depth;i++){
+                    *(c+i)='0';
+                }
+        }
+        *(c+*(buf_nr_p)+*maxdepth_p-(unsigned int)depth)=temp+48;
+        //printf("+_%c_+",temp+48);
+        for(int i=0;i<depth-1;i++){
+                tempp=tempp*10;
+        };
+        //printf("depth_%d",depth);
+        //printf("val%d-temp%d*tempp%d is:%d",val,temp,tempp,val-temp*tempp);
+        if((val-temp*tempp)>10){
+                val_u_deal(val-temp*tempp,c,maxdepth_p,buf_nr_p);
+        }else if((val-temp*tempp)>0&&(val-temp*tempp)<9){
+		*(c+*(buf_nr_p)+*maxdepth_p)=(val-temp*tempp)+48;
+        //      printf("error");
+        }
+
+};
+
+void val_u_deal_tool(unsigned int val,char *c,int *buf_nr_p){
+    *buf_nr_p=0;
+	//unsigned int a=0x893e;
+	//printf("%u\n",a);
+        int t_maxdepth=-1;
+        val_u_deal(val,c,&t_maxdepth,buf_nr_p);
+ 	//val_deal(val,c,&t_maxdepth,buf_nr_p);
+	*buf_nr_p=*buf_nr_p+t_maxdepth+1;
+}
+

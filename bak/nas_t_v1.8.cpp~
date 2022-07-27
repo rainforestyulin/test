@@ -1,0 +1,673 @@
+#include <iostream>
+#include <mutex>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <stdio.h>
+#include <cstring>
+#include <vector>
+#include <math.h>
+#include "int2char.cpp"
+#include <cassert>
+#include <time.h>
+#include "HTTP.h"
+#include "DHCP.h"
+#include "DNS.h"
+#include "MQTT.h"
+#include "thread.h"
+#include <malloc.h>
+#include <pthread.h>
+#include <unistd.h>
+#define WIND_SIZE 2000
+#define T_num 1
+#define TOTAL_SIZE WIND_SIZE*T_num
+#define ERROR_LEN 1500
+#define TIME_TO_SLEEP 0
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+unsigned int num=0;
+using namespace std;
+int mqtt_version;
+unsigned char dat_wind[TOTAL_SIZE]={0};
+bool mem_flag[T_num]={false};
+char REC_T_PATH[T_num][20]={0};
+char REC_PATH_N_HEAD[]="./rec";
+char REC_PATH[]="./output/result.txt";
+char cmd_1[T_num*20]="cat ";
+static struct link_type{
+	int type;
+	const char *name;
+	int name_len;
+}links[]={
+	{0,"BSD loopback devices, except for later OpenBSD\n",sizeof("BSD loopback devices, except for later OpenBSD")},
+	{1,"Ethernet, and Linux loopback devices\n",sizeof("Ethernet, and Linux loopback devices")},
+	{6,"802.5  Token Ring\n",sizeof("802.5  Token Ring")},
+	{7,"ARCnet\n",sizeof("ARCnet")},
+	{8,"SLIP\n",sizeof("SLIP")},
+	{9,"PPP\n",sizeof("PPP")}
+};
+static struct ICMP_type{
+        int type;
+	int code;
+        const char *name;
+        int name_len;
+}ICMP_types[]={
+        {0,0,"Echo Reply\n",sizeof("Echo Reply")},
+        {8,0,"Echo\n",sizeof("Echo")},
+        {3,0,"Net Unreachable\n",sizeof("Net Unreachable")},
+        {3,1,"Host Unreachable\n",sizeof("Host Unreachable")},
+        {3,2,"Protocol Unreachable\n",sizeof("Protocol Unreachable")},
+        {3,3,"Port unreachable\n",sizeof("Port unreachable")},
+	{3,4,"Fragmentation Needed, and DF was set\n",sizeof("Fragmentation Needed, and DF was set")},
+	{3,5,"Source route failed\n",sizeof("Source route failed")},
+	{3,6,"Destination network unknown\n",sizeof("Destination network unknown")},
+	{3,7,"Destination host unknown\n",sizeof("Destination host unknown")},
+	{3,8,"Source host isolated\n",sizeof("Source host isolated")},
+	{3,9,"Communication with destination network is administratively prohibited\n",sizeof("Communication with destination network is administratively prohibited")},
+	{3,10,"Communication with destination host is administratively prohibited\n",sizeof("Communication with destination host is administratively prohibited")},
+	{3,11,"Destination network unreachable for type of service\n",sizeof("Destination network unreachable for type of service")},
+	{3,12,"Destination host unreachable for type of service\n",sizeof("Destination host unreachable for type of service")},
+	{3,13,"Communication administratively prohibited\n",sizeof("Communication administratively prohibited")},
+	{3,14,"Host precedence violation\n",sizeof("Host precedence violation")},
+	{3,15,"Precedence cutoff in effect\n",sizeof("Precedence cutoff in effect")},
+	{4,0,"Source shutdown\n",sizeof("Source shutdown")},
+	{5,0,"Redirect datagram for the network (or subnet)\n",sizeof("Redirect datagram for the network (or subnet)")},
+	{5,1,"Redirect datagram for the host\n",sizeof("Redirect datagram for the host")},
+	{5,2,"Redirect datagram for the type of service and network\n",sizeof("Redirect datagram for the type of service and network")},
+	{5,3,"Redirect datagram for the type of service and host\n",sizeof("Redirect datagram for the type of service and host")},
+
+
+};
+static struct MAC_P_type{
+	int type;
+	const char *name;
+	int name_len;
+}MAC_types[]{
+	{0x0800,"IPv4\n",sizeof("IPv4")},
+	{0x86DD,"IPv6\n",sizeof("IPv6")},
+	{0x0806,"Address Resolution Protocol\n",sizeof("Address Resolution Protocol")},
+	{0x0808,"Frame Relay ARP\n",sizeof("Frame Relay ARP")},
+	{0x8035,"RARP\n",sizeof("RARP")}
+};
+static struct IP_p_type{
+        int type;
+        const char *name;
+        int name_len;
+}IP_types[]={
+	{0x6,"TCP\n",sizeof("TCP")},
+        {0x11,"UDP\n",sizeof("UDP")},
+	{0x01,"ICMP\n",sizeof("ICMP")},
+};
+
+
+#define MAC_type_num (sizeof(MAC_types)/sizeof(MAC_types[0]))
+#define link_num (sizeof(links)/sizeof(links[0]))
+#define IP_num (sizeof(IP_types)/sizeof(IP_types[0]))
+#define ICMP_num (sizeof(ICMP_types)/sizeof(ICMP_types[0]))
+static unsigned int mode[2]={0xa1b2c3d4,0xd4c3b2a1};
+bool death_flag=true;
+unsigned int get_int(const unsigned char *addr);
+unsigned int get_2bytes(const unsigned char *addr);
+bool head_op(unsigned char *addr,ofstream *of);
+bool data_partition(unsigned char *addr,ofstream *of,ifstream *red,unsigned int *read_flag);
+char *get_time(char *nowtime,time_t t);
+unsigned int get_int_rev(const unsigned char *addr);
+void get_byte(char onebyte,char *sav_addr);
+bool data_read(unsigned char* addr,unsigned int num,unsigned int *read_flag,ifstream *cap_read);
+bool APP_port(unsigned char* addr,ofstream *of,unsigned int  port_i,unsigned int port_o);
+bool MAC_op(unsigned char *addr,ofstream *of);
+bool data_load(unsigned char *addr,bool *flag,unsigned int* read_flag,ifstream *inf);
+bool data_partition_t(unsigned char *addr,ofstream *of);
+mutex mtx;
+struct par{
+        unsigned char *addr;
+        bool *flag;
+	unsigned int* p_read_flag;
+	std::ifstream *inf;
+};
+struct par_worker{
+	bool *isend;
+	unsigned char *addr;
+	bool *flag;
+	std::ofstream *of;
+};
+void thread_body(bool *isend,bool *isready,unsigned char* addr,ofstream *of){
+	while(*isend){
+		if(*isready==false){
+		}else{
+			data_partition_t(addr,of);
+			*isready=false;
+		}
+	}
+}
+
+void thread_runner(void *args){
+	struct par_worker* mp=(struct par_worker*)args;
+	thread_body(mp->isend,mp->flag,mp->addr,mp->of);
+}
+
+
+
+void loader(void *args){
+	struct par *par=(struct par*)args;
+	data_load(par->addr,par->flag,par->p_read_flag,par->inf);
+}
+
+bool data_load(unsigned char *addr,bool *flag,unsigned int* read_flag,ifstream *inf){
+	while(1){
+		for(int i=0;i<T_num;i++){
+			if(*(flag+i)==false){
+				num++;
+				if(data_read(addr+WIND_SIZE*i,16,read_flag,inf)){
+					unsigned int len=get_int_rev(addr+WIND_SIZE*i+8);
+					unsigned int saved_len=get_int_rev(addr+WIND_SIZE*i+12);
+					if(len>ERROR_LEN){
+						*read_flag=*read_flag+len;
+						continue;
+					}
+					assert(len==saved_len);
+					data_read(addr+WIND_SIZE*i+16,len,read_flag,inf);
+					*(flag+i)=true;
+				}else{
+					death_flag=false;
+					return false;
+				}
+			
+
+			}else{
+			}
+		}
+	}
+	return true;
+}
+
+int main(int argc,char* args[]){
+	char *temp;
+	if(argc==1){
+		return -1;
+	}else if(argc==2){
+		temp=args[1];
+	}
+	memset(dat_wind,0,sizeof(dat_wind));
+	unsigned int read_flag=0;
+	
+	ofstream of_t[T_num];
+	char nametemp[2]={0};
+	int namelen=0;
+	for(int i=0;i<T_num;i++){
+		namelen=0;
+		val_deal_tool(i,&nametemp[0],&namelen);
+		int j;
+		for(j=0;j<sizeof(REC_PATH_N_HEAD)-1;j++){
+			REC_T_PATH[i][j]=REC_PATH_N_HEAD[j];
+		};
+		int k;
+		for(k=j;k<j+namelen;k++){
+			REC_T_PATH[i][k]=nametemp[k-j];
+		};
+		of_t[i].open(&REC_T_PATH[i][0]);
+	};
+
+	
+
+
+
+
+	ifstream cap_read(temp);
+	if (!cap_read.is_open()) {
+		cout << "open error" << endl;
+		return -1;
+	}
+	data_read(&dat_wind[0],24,&read_flag,&cap_read);
+	if(head_op(&dat_wind[0],&of_t[0])){}else{
+		return -1;
+	};
+	pthread_t thread;
+        par mpar;
+	mpar.flag=&mem_flag[0];
+	mpar.addr=&dat_wind[0];
+	mpar.p_read_flag=&read_flag;
+	mpar.inf=&cap_read;
+	create((void*)loader,(void*)&mpar);
+
+	
+	
+	struct par_worker pars[T_num];
+	for(int i=0;i<T_num;i++){
+		pars[i].isend=&death_flag;
+		pars[i].addr=&dat_wind[i*WIND_SIZE];
+		pars[i].flag=&mem_flag[i];
+		pars[i].of=&of_t[i];
+	};
+	for(int i=0;i<T_num;i++){
+		create((void*)thread_runner,(void*)&pars[i]);
+	};
+	cleanup();
+	printf("analysis_finished!\nwriting...\n");
+	namelen=4;
+	for(int i=0;i<T_num&&i<num;i++){
+		int j=0;
+		while(REC_T_PATH[i][j+2]!='\0'){
+			cmd_1[namelen++]=REC_T_PATH[i][j+2];
+			j++;
+		};
+		cmd_1[namelen++]=' ';
+	};
+	cmd_1[namelen++]='>';
+	for(int i=0;i<19;i++){
+		cmd_1[namelen++]=REC_PATH[i+2];
+	}
+	system(cmd_1);
+	system("rm rec*");
+	printf("finished!\nnum is:%d\n",num-2);
+	return 0;
+}
+unsigned int get_int(unsigned char *addr){
+	unsigned int val=0;
+	val=val+*(addr+3);
+	val=val+((*(addr+2))<<8);
+	val=val+((*(addr+1))<<16);
+	val=val+((*addr)<<24);
+	return val;
+}
+unsigned int get_int_rev(unsigned char *addr){
+	unsigned int val=0;
+	val=val+((*(addr+3))<<24);
+	val=val+((*(addr+2))<<16);
+	val=val+((*(addr+1))<<8);
+	val=val+(*addr);
+	return val;
+}
+unsigned int get_2bytes(unsigned char *addr){
+	unsigned int val=0;
+	val=val+*(addr+1);
+	val=val+((*addr)<<8);
+	return val;
+}
+void get_byte(char onebyte,char *sav_addr){
+	char onepart[2]={(onebyte&0xf0)>>4,onebyte&0x0f};
+	for(int i=0;i<=1;i++){
+		if(onepart[i]>=0&&onepart[i]<=9){
+			*(sav_addr+i)=48+onepart[i];
+		}else if(onepart[i]>=0xa&&onepart[i]<=0xf){
+			*(sav_addr+i)=87+onepart[i];
+		}else{
+			assert(-1);
+		}
+	}
+}
+bool Http_op(unsigned char *addr,ofstream *of){
+	Http mhttp((char*)addr,of);
+	return true;
+}
+bool DNS_op(unsigned char *addr,ofstream *of){
+        DNS mdns(addr,of);
+        return true;
+}
+bool MQTT_op(unsigned char* addr, ofstream* of) {
+	MQTT mqtt(addr, of, &mqtt_version);
+	return true;
+}
+bool DHCP_op(unsigned char *addr,ofstream *of){
+		DHCP mdhcp(addr,of);
+		return true;
+}
+bool TCP_op(unsigned char *addr,ofstream *of){
+	char tempchar[20]={0};
+	int tempint=0;
+	int head_len=0;
+	unsigned int port_i,port_o=0;
+	of->write("\nTCP_source_port:",sizeof("TCP_source_port:"));
+	port_o=get_2bytes(addr);
+	val_deal_tool(port_o,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nTCP_target_port:",sizeof("TCP_target_port:"));
+	tempint=0;
+	port_i=get_2bytes(addr+2);
+	val_deal_tool(port_i,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nTCP_head_length:",sizeof("TCP_head_length:"));
+	tempint=0;
+	head_len=4*((((int)*(addr+12))&0xf0)>>4);
+	val_deal_tool(head_len,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	APP_port(addr+head_len,of,port_i,port_o);
+	return true;
+}
+	bool UDP_op(unsigned char *addr,ofstream *of){
+		char tempchar[20]={0};
+		int tempint=0;
+		int data_len=0;
+		unsigned int port_i,port_o=0;
+		of->write("\nUDP_source_port:",sizeof("UDP_source_port:"));
+		port_o=get_2bytes(addr);
+		val_deal_tool(get_2bytes(addr),&tempchar[0],&tempint);
+		of->write(&tempchar[0],tempint);
+		of->write("\nUDP_target_port:",sizeof("UDP_target_port:"));
+		tempint=0;
+		port_i=get_2bytes(addr+2);
+		val_deal_tool(get_2bytes(addr+2),&tempchar[0],&tempint);
+		of->write(&tempchar[0],tempint);
+		of->write("\nUDP_data_length:",sizeof("UDP_data_length:"));
+		tempint=0;
+		val_deal_tool(get_2bytes(addr+4),&tempchar[0],&tempint);
+		of->write(&tempchar[0],tempint);
+	APP_port(addr+8,of,port_i,port_o);
+	return true;
+}
+bool ICMP_op(unsigned char *addr,ofstream *of){
+	char tempchar[20]={0};
+        int tempint=0;
+	of->write("\nICMP_type:",sizeof("ICMP_type:"));
+	val_deal_tool((int)(*addr),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nICMP_type_code:",sizeof("ICMP_type_code:"));
+	tempint=0;
+	val_deal_tool((int)(*(addr+1)),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nICMP_type_discription:",sizeof("ICMP_type_discription:"));
+	for(int i=0;i<ICMP_num;i++){
+		if((int)(*addr)==ICMP_types[i].type&&(int)(*(addr+1))==ICMP_types[i].code){
+			of->write(ICMP_types[i].name,ICMP_types[i].name_len);
+			break;
+		}
+	}
+	return true;
+}
+
+bool IPv4_op(unsigned char *addr,ofstream *of){
+	int next_step=0;
+	unsigned int h_len=0;
+        of->write("IP_version:",sizeof("IP_version:")-1);
+        char ver=(((*addr)&0xf0)>>4)+48;
+        of->write(&ver,1);
+        of->write("\nIP_head_length:",sizeof("IP_head_length:"));
+        h_len=((*addr)&0x0f)*4;
+        char tempchar[20]={0};
+        int tempint=0;
+        val_deal_tool(h_len,&tempchar[0],&tempint);
+        of->write(&tempchar[0],tempint);
+	of->write("\nIP_extra_flag:",sizeof("IP_extra_flag:"));
+	if(*(addr+1)==0){
+		of->write("NULL",sizeof("NULL")-1);
+	}else{
+		int tempint=0;
+	        val_deal_tool((int)*(addr+1),&tempchar[0],&tempint);
+		of->write(&tempchar[0],tempint);
+	}
+	of->write("\nIP_packet_total_size:",sizeof("IP_packet_total_size:"));
+	tempint=0;
+	val_deal_tool(get_2bytes(addr+2),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIP_flag:",sizeof("IP_flag:"));
+	tempint=0;
+	val_deal_tool(get_2bytes(addr+4),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIP_last_section?:",sizeof("IP_last_section?:"));
+	if(((*(addr+6))&0xe0)==0x80){
+		of->write("No",sizeof("No")-1);
+	}else if(((*(addr+6))&0xe0)==0x0){
+		of->write("Yes",sizeof("Yes")-1);
+	}else if(((*(addr+6))&0xe0)==0x40){
+		of->write("Yes",sizeof("Yes")-1);
+	}else{
+		assert(0);
+	};
+	of->write("\nIP_section_shift:",sizeof("IP_section_shift:"));
+	tempint=0;
+	val_u_deal_tool(((get_int(addr+6))&0x1fff)/135,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIP_packet_TTL:",sizeof("IP_packet_TTL:"));
+	tempint=0;
+        val_deal_tool((get_2bytes(addr+8)&0xff00)>>8,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIP_upper_protocol:",sizeof("IP_upper_protocol:"));
+	for(tempint=0;tempint<IP_num;tempint++){
+                if(*(addr+9)==IP_types[tempint].type){
+			next_step=IP_types[tempint].type;
+                        of->write(IP_types[tempint].name,IP_types[tempint].name_len);
+                        break;
+                }else{
+
+                }
+        };
+	of->write("IP_source_address:",sizeof("IP_source_address:")-1);
+	for(tempint=0;tempint<=3;tempint++){
+		int aa=0;
+		val_deal_tool((int)*(addr+12+tempint),&tempchar[0],&aa);
+		of->write(&tempchar[0],aa);
+		if(tempint!=3){
+			of->write(".",1);
+		}
+	};
+	of->write("\nIP_target_address:",sizeof("IP_target_address:"));
+        for(tempint=0;tempint<=3;tempint++){
+                int aa=0;
+                val_deal_tool((int)*(addr+16+tempint),&tempchar[0],&aa);
+                of->write(&tempchar[0],aa);
+                if(tempint!=3){
+                       of->write(".",1);
+                }
+        };
+	switch (next_step){
+		case 0x06:
+			TCP_op(addr+(unsigned char)h_len,of);
+			break;
+		case 0x11:
+			UDP_op(addr+(unsigned char)h_len,of);
+			break;
+		case 0x01:
+			ICMP_op(addr+(unsigned char)h_len,of);
+			break;
+	};
+	return true;
+}
+
+bool IPv6_op(unsigned char *addr,ofstream *of){
+	int next_step=0;
+	int h_len=0;
+	char tempchar[20]={0};
+	int tempint=0;
+        of->write("IP_version:",sizeof("IP_version:")-1);
+        char ver=(((*addr)&0xf0)>>4)+48;
+        of->write(&ver,1);
+	of->write("\nIPv6_data_level:",sizeof("IPv6_data_level:"));
+	val_deal_tool((((*addr)&0x0f)<<4)+(((*(addr+1))&0xf0)>>4),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIPv6_data_flag:",sizeof("IPv6_data_flag:"));
+	tempint=0;
+	val_deal_tool((((*(addr+1))&0x0f)<<16)+get_2bytes(addr+2),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIPv6_carry_on:",sizeof("IPv6_carry_on:"));
+	tempint=0;
+        val_deal_tool(get_2bytes(addr+4),&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIPv6_next_head:",sizeof("IPv6_next_head:"));
+	tempint=0;
+	next_step=(int)*(addr+6);
+        val_deal_tool(next_step,&tempchar[0],&tempint);
+	of->write(&tempchar[0],tempint);
+	of->write("\nIPv6_MAX_hop:",sizeof("IPv6_MAX_hop:"));
+	tempint=0;
+        val_deal_tool((int)*(addr+7),&tempchar[0],&tempint);
+        of->write(&tempchar[0],tempint);
+	of->write("\nIPv6_source_address:",sizeof("IPv6_source_address:"));
+	for(int i=0;i<=7;i++){
+		for(int j=0;j<=1;j++){
+			get_byte(*(addr+8+i*2+j),&tempchar[0]);
+			of->write(&tempchar[0],1);
+	                of->write(&tempchar[1],1);
+		}
+                if(i!=7){
+                        of->write(":",1);
+                }
+        };
+	of->write("\nIPv6_target_address:",sizeof("IPv6_target_address:"));
+	for(int i=0;i<=7;i++){
+                for(int j=0;j<=1;j++){
+                        get_byte(*(addr+24+i*2+j),&tempchar[0]);
+                        of->write(&tempchar[0],1);
+                        of->write(&tempchar[1],1);
+                }
+                if(i!=7){
+                        of->write(":",1);
+                }
+        };
+	switch (next_step){
+                case 0x06:
+                        TCP_op(addr+(unsigned char)h_len,of);break;
+                case 0x11:
+                        UDP_op(addr+(unsigned char)h_len,of);break;
+                case 0x01:
+                        ICMP_op(addr+(unsigned char)h_len,of);break;
+        };
+	return true;
+}
+
+bool MAC_op(unsigned char *addr,ofstream *of){
+	char tempbyte[2];
+	int next_step=0;
+	of->write("\nTarget_MAC_address:",sizeof("Target_MAC_address:"));
+	for(int i=0;i<=5;i++){
+		get_byte(*(addr+i),&tempbyte[0]);
+		of->write(&tempbyte[0],1);
+		of->write(&tempbyte[1],1);
+		if(i!=5){
+			of->write(":",1);
+		}
+	}
+	of->write("\nSource_MAC_address:",sizeof("Source_MAC_address:"));
+	for(int i=0;i<=5;i++){
+                get_byte(*(addr+i+6),&tempbyte[0]);
+                of->write(&tempbyte[0],1);
+                of->write(&tempbyte[1],1);
+                if(i!=5){
+                        of->write(":",1);
+                }
+        };
+	of->write("\nMAC_Packet_type:",sizeof("MAC_Packet_type:"));
+	for(int i=0;i<MAC_type_num;i++){
+		if(get_2bytes(addr+12)==MAC_types[i].type){
+			next_step=MAC_types[i].type;
+			of->write(MAC_types[i].name,MAC_types[i].name_len);
+			break;
+		}else{
+		
+		}
+	};
+	switch (next_step){
+		case 0x0800:
+			IPv4_op(addr+14,of);
+			break;
+		case 0x86DD:
+			IPv6_op(addr+14,of);
+			break;
+
+	}
+	return true;
+}
+bool head_op(unsigned char *addr,ofstream *of){
+	unsigned int tempint=0;
+	int tempint2char=0;
+	char tempchar[6]={0};	
+	tempchar[4]='\0';
+	of->write("Data_Mode:",sizeof(char)*10);
+	if((get_int(addr))==0xa1b2c3d4){
+		of->write("Big-endian\n",sizeof("Big-endian"));
+	}else if((get_int(addr))==0xd4c3b2a1){
+		of->write("Little-endian\n",sizeof("Little-endian"));
+	}else{
+		return false;
+	}
+	if((get_int(addr+4))==0x02000400){
+		of->write("File_version:2.4\n",sizeof("File_version:2.4"));
+	}else{
+		of->write("File_version:undefined",sizeof("File_version:undefined"));
+	}
+	of->write("MAX_store_length:",sizeof("MAX_store_length:")-1);
+	int a=0;
+	val_deal_tool(get_int(addr+16),&tempchar[0],&a);
+	int j=0;
+	of->write(&tempchar[0],a);
+	of->write("\n",1);
+	of->write("Link_type:",sizeof("link_type:")-1);
+	while(j<=link_num){
+		assert(j<link_num);
+		if(links[j].type==*(addr+20)){
+			break;
+		}else{
+			j++;
+		}
+	};
+	of->write(links[j].name,links[j].name_len);
+	for(int i=0;i<=links[j].name_len+10;i++){
+		of->write("+",1);
+	}
+	of->write("\n",1);
+	return true;
+}
+
+
+bool data_partition_t(unsigned char *addr,ofstream *of){
+	of->write("\n+-----------------------------------------------+\n",sizeof("-------------------------------------------------")+1);
+        static int tid=0;
+        int length=0;
+        unsigned data_length=0;
+        of->write("\nP_Catch_time:",sizeof("P_Catch_time:"));
+        char tempchar[24];
+        of->write(get_time(&tempchar[0],(time_t)get_int_rev(addr)),19);
+	length=0;
+	val_deal_tool(get_int_rev(addr+4),&tempchar[0],&length);
+	of->write("  ",2);
+	of->write(&tempchar[0],length);
+	of->write("us\n",3);
+        of->write("Packet_length:",sizeof("Packet_length:")-1);
+	length=0;
+        val_deal_tool(get_int_rev(addr+8),&tempchar[0],&length);
+        of->write(&tempchar[0],length);
+        of->write("\nSaved_length:",sizeof("Saved_length:"));
+        length=0;
+        memset(tempchar,0,sizeof(tempchar));
+        data_length=get_int_rev(addr+12);
+        val_deal_tool(data_length,&tempchar[0],&length);
+        of->write(&tempchar[0],length);
+        MAC_op(addr+16,of);
+        return true;
+}
+
+
+
+char *get_time(char* nowtime,time_t t){
+	struct tm *lt;
+	lt=localtime(&t);
+	memset(nowtime,0,sizeof(nowtime));
+	strftime(nowtime,24,"%Y-%m-%d %H:%M:%S",lt);
+	return nowtime;
+}
+
+bool data_read(unsigned char* addr,unsigned int num,unsigned int *read_flag,ifstream *cap_read){
+	cap_read->seekg(0);
+	if(cap_read->seekg(*read_flag)){
+		cap_read->read((char *)addr, num);
+		*read_flag=*read_flag+num;
+		return true;
+	}else{
+		return false;
+	}
+}
+bool APP_port(unsigned char* addr,ofstream *of,unsigned int  port_i,unsigned int port_o){
+	if (port_i == 80 || port_o == 80) {
+		Http_op(addr, of);
+	}
+	else if (port_i == 53 || port_o == 53) {
+		DNS_op(addr, of);
+	}
+	else if (port_i == 68 || port_i == 67 || port_o == 68 || port_i == 67) {
+		DHCP_op(addr, of);
+	}
+	else if (port_i == 1883 || port_o == 1883) {
+		MQTT_op(addr, of);
+	}
+	return true;
+}
+

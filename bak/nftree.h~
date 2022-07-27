@@ -1,0 +1,17 @@
+#define V4 ip_union._v4
+#define V6 ip_union._v6
+
+// single IP addr for next hop and bgp next hop
+typedef struct ip_addr_s {
+	union {
+		struct {
+			uint32_t	fill[3];
+			uint32_t	_v4;
+		};
+		uint64_t		_v6[2];
+	} ip_union;
+} ip_addr_t;
+/*struct timeval{
+    uint64_t t;
+};*/
+

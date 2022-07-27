@@ -1,0 +1,3 @@
+#!/usr/local/bin/lua
+echo $1;
+print($1);

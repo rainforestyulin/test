@@ -1,0 +1,163 @@
+#include <string>
+#include <map>
+#include <sstream>
+#include <iostream>
+using namespace std;
+extern void get_byte(char onebyte, char* sav_addr);
+class Http {
+private:
+    //void *file_op;
+    ofstream *of;
+    ofstream *cus;
+public:
+    Http(char* buf,ofstream *of, ofstream *cus);
+    ~Http();
+    void write(string str, ofstream* of, ofstream *cus);
+};
+
+void Http::write(string str, ofstream* of, ofstream *cus) {
+    const char* tempp = str.c_str();
+    for (int i = 0; i < str.length(); i++) {
+        if (*(tempp + i) < 32 || *(tempp + i) > 126)  continue;
+        of->write(tempp + i, 1);
+        cus->write(tempp + i, 1);
+    }
+}
+
+/*
+ *靠tuff
+ * */
+Http::Http(char* msg,ofstream *of, ofstream *cus) {
+    //struct FILE_OPERATOR *filer=(struct FILE_OPERATOR *)file_op;
+    this->of=of;
+    this->cus=cus;
+    string buf(msg);
+    istringstream buf_stream(buf);
+    enum parts {
+        start_line,
+        headers,
+        body
+    };
+    parts part = start_line;
+    string line;
+    string body_string;
+    char* line_tem;
+    while (getline(buf_stream, line)) {
+        switch (part)
+        {
+        case start_line:
+        { 
+            istringstream line_stream(line);
+            if ((int)*(line.c_str()) < 32 || (int)*(line.c_str()) > 126) break;
+            string tmp;
+            cus->write(" ", 1);
+            of->write("\n", 1);
+            line_stream >> tmp;
+            const  char* temp = tmp.c_str();
+            if (tmp.find("HTTP") != string::npos) { 
+                of->write("Version:", 8);
+                cus->write("Version:", 8);
+
+                write(temp, of, cus);
+                of->write("\n", 1);
+
+                line_stream >> tmp;
+                temp = tmp.c_str();
+                of->write("Status:", 7);
+                cus->write("Status:", 7);
+
+                write(temp, of, cus);
+                cus->write(" ", 1);
+                of->write("\n", 1);
+
+                line_stream >> tmp;
+                temp = tmp.c_str();
+                of->write("Status_text:", 12);
+                cus->write("Status_text:", 12);
+
+                write(temp, of, cus);
+                cus->write(" ", 1);
+                of->write("\n", 1);
+            }
+            else{
+                //temp = tmp.c_str();
+                of->write("Method:", 7);
+                cus->write("Method:", 7);
+
+                write(temp, of, cus);
+                of->write("\n", 1);
+                cus->write(" ", 1);
+
+                line_stream >> tmp;
+                temp = tmp.c_str();
+                of->write("Path:", 5);
+                cus->write("Path:", 5);
+
+                write(temp, of, cus);
+                of->write("\n", 1);
+                cus->write(" ", 1);
+
+                line_stream >> tmp;
+                temp = tmp.c_str();
+                of->write("Version:", 8);
+                cus->write("Version:", 8);
+
+                write(temp, of, cus);
+                of->write("\n", 1);
+                cus->write(" ", 1);
+              
+            }
+            part = headers;
+            break;
+        }
+        case headers:
+        {
+            if (line.size() == 1) {
+                part = body;
+                break;
+            }
+            auto pos = line.find(":");
+            if (pos == string::npos)//find没找到:
+                continue;
+            string tmp1(line, 0, pos);//记录名称
+            string tmp2(line, pos + 1);//记录内容（从下标为pos+1开始，直到字符串末尾）
+            const  char* temp1 = tmp1.c_str();
+            const  char* temp2 = tmp2.c_str();
+            write(temp1, of, cus);
+            of->write(":", 1);
+            cus->write(":", 1);
+
+            write(temp2, of, cus);
+            cus->write(" ", 1);
+
+            of->write("\n", 1);
+            break;
+        }
+        case body:
+        {
+            body_string.append(line);
+            //cout << line << endl;
+            body_string.push_back('\n');
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    if (body_string.length() > 1) {
+        const  char* temp = body_string.c_str();
+        char save_addr[3] = {0};
+        of->write("Body:0x", 7);
+        cus->write("Body:0x", 7);
+
+        for (int i = 0; i < body_string.length(); i++) {
+            get_byte(*(temp + i), save_addr);
+            cus->write(save_addr, 1);
+            of->write(save_addr, 1);
+        }
+        //write(temp, of);
+        //of->write("\n", 1);
+    }
+}
+
+Http::~Http() {}

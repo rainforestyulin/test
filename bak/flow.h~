@@ -1,0 +1,146 @@
+#include <iostream>
+using namespace std;
+typedef unsigned int uint32;
+typedef unsigned long int uint64;
+typedef unsigned char uchar;
+typedef unsigned short int uint16;
+typedef short int int16;
+/**
+ *描述流的数据结构
+ */
+union IP_v4{
+    uchar IP_byte[4];
+    uint32 IP_int;
+};
+union IP_v6{
+    uchar IP_byte[16];
+    uint64 IP_int[2];
+};
+/*struct IP{
+    union{
+        union IP_v4 IP4;
+        union IP_v6 IP6;
+    };
+    bool operator==(const IP& ip2){
+        return (ip_union.IP4.IP_int==ip2.ip_union.IP4.IP_int) || ((ip_union.IP6.IP_int[0]==ip2.ip_union.IP6.IP_int[0])&&
+                                                (ip_union.IP6.IP_int[1]==ip2.ip_union.IP6.IP_int[1])&&
+                                                (ip_union.IP6.IP_int[2]==ip2.ip_union.IP6.IP_int[2])&&
+                                                ip_union.IP6.IP_int[3]==ip2.ip_union.IP6.IP_int[3]));
+    }
+};*/
+
+union Port{
+    uchar port_byte[2];
+    uint16 port_int;
+    bool operator==(const Port& p2){
+        return port_int==p2.port_int;
+    }
+};
+union Interface{
+    uchar if_byte[2];
+    uint16 if_int;
+};
+union unix_time{
+    uint32 unix_sns32[2];
+    uint64 unix_sns64;
+};
+// v5.0
+// v5 header format
+
+#pragma pack(push, 1)
+struct flow_head{
+    uchar version;              //flow的版本号
+    uchar count;                //该数据包中导出的流的个数
+    uint32 SysUptime;           //导出系统上线的时长
+    uint32 unix_secs;
+    uint32 unix_nsecs;
+    uint32 flow_sequence;
+    uchar engine_id;
+    uint16 sampling_interval;
+};
+// v5.0
+// Flow record format
+struct flow_info{
+    ip_addr_t srcaddr;
+    ip_addr_t dstaddr;
+    ip_addr_t nexthop;
+    uint16 input;
+    uint16 output;
+    uint32 dPkts;
+    uint32 dOctets;            //Total number of Layer_3_Protocol bytes;
+    struct timeval First;
+    struct timeval Last;
+    uint16 srcport;
+    uint16 dstport;
+    uchar pad1;
+    uchar tcp_flags;
+    uchar prot;
+    uchar tos;
+    uint16 src_as;
+    uint16 dst_as;
+    uchar src_mask;
+    uchar dst_mask;
+    uint16 pad2;
+};
+#pragma pop()
+struct flow_list{
+    uint32 id;
+    struct flow_info info;
+    struct flow_list *next;
+};
+struct IP_v4_head{
+    uchar v4b_h4b;
+    uchar tos;
+    uint16 Plength;
+    uint16 id;
+    uint16 flag3b_shift13b;
+    uchar TTL;
+    uchar protocol;
+    uint16 head_check;
+    ip_addr_t srcaddr;
+    ip_addr_t dstaddr;
+};
+struct IP_v6_head{
+    uint32 v4b_tos8b_lb20b;
+    uint16 payloadlenght;
+    uchar nextheader;
+    uchar hoplimit;
+    ip_addr_t srcaddr;
+    ip_addr_t dstaddr;
+};
+union IP_head{
+    struct IP_v4_head ip_4;
+    struct IP_v6_head ip_6;
+};
+
+struct PCAP_head{
+    uint32 MagicNum;
+    uint16 MajorV;
+    uint16 MinorV;
+    uint32 ThisZone;
+    uint32 SigFig;
+    uint32 SnapLen;
+    uint32 LinkType;
+};
+struct PCAP_FORMAT{
+    uint32 TimeStamp_s;
+    uint32 TimeStamp_ns;
+    uint32 CapturedLen;
+    uint32 UncapturedLen;
+};
+
+
+struct MAC_FORMAT{
+    uchar dst_mac_addr[6];
+    uchar src_mac_addr[6];
+    uint16 type;
+};
+struct TCP_UPD_HEAD{
+    union Port srcport;
+    union Port dstport;
+};
+struct FILE_OPERATOR{
+    ofstream *res;
+    ofstream *cus;
+    ofstream *v5;
+};

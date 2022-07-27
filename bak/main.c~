@@ -1,0 +1,14 @@
+#include <stdio.h>
+#include "KMP.c"
+#include "rand_a2b.c"
+#include <assert.h>
+int main(){
+    char *a="babxaaxbxxxb";
+    char *b="axbxxx";
+    printf("\n%d\n",Index_KMP(a, b, 6) );
+    for(int i=4;i<20;i++){
+        printf("%s\n",rand_strings(i));
+    }
+    //printf("hello!\n");
+}
+

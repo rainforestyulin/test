@@ -1,0 +1,36 @@
+#include <stdlib.h>
+#include <time.h>
+#include "rand_a2b.h"
+#include <assert.h>
+/* 产生[a, b]之间的随机数，返回值为int型 */
+int rand_a2b(int a, int b)
+{
+    srand((unsigned)time(NULL));
+    return a+rand()%(b-a+1);
+}
+
+/* 产生长度为len的随机字符串，字符串元素范围[a-z][A-Z] */
+char * rand_strings(int len)
+{
+    char *s = (char *)malloc(sizeof(char)*len);
+    int i = 0;
+    while(i<len)
+    {
+        int verb_type = rand_a2b(1, 2);
+        switch (verb_type)
+        {
+        case 1:
+            *(s+i) = (char)rand_a2b(97, 122);
+            ++i;
+            break;
+        case 2:
+            *(s+i) = (char)rand_a2b(65, 90);
+            ++i;
+            break;
+        default:
+            assert(0);
+        }
+
+    }
+    return s;
+}

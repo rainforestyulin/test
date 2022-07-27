@@ -1,0 +1,55 @@
+#include <stdio.h>
+#include <stdlib.h>
+struct CharStack{
+    int size;
+    int top;
+    char buffer[1000];
+};
+void InitStack(struct CharStack *stack){
+    stack->size=0;
+    stack->top=0;
+};
+void push(struct CharStack *stack,char *c){
+    printf("\npush%c", *c);
+    stack->buffer[stack->top]=*c;
+    stack->size++;
+    stack->top++;    
+};
+void pop(struct CharStack *stack){
+    printf("\npop%c", stack->buffer[stack->top-1]);
+    stack->buffer[stack->top-1]='\0';
+    stack->size--;
+    stack->top--;
+}
+char getac(struct CharStack *stack){
+    if(stack->top-1==-1){
+        return '\0';
+    }
+    return stack->buffer[stack->top-1];
+}
+int minAddToMakeValid(char * s){
+    struct CharStack mstack;
+    InitStack(&mstack);
+    int slen=0;
+    while(*(slen+s)!='\0'){
+        if(*(slen+s)=='('){
+            if(getac(&mstack)==')'){
+                pop(&mstack);
+            }else{
+                push(&mstack,s+slen);
+            }
+        }else{
+            if(getac(&mstack)=='('){
+                pop(&mstack);
+            }else{
+                push(&mstack,s+slen);
+            }
+        }
+        slen++;
+    }
+    return mstack.size;
+}
+int main(){
+    char a[]="())";
+    printf("\n%d", minAddToMakeValid(&a[0]));
+}

@@ -1,0 +1,7 @@
+#!/usr/local/bin/lua
+function test()
+    print("arg[0]=", arg[0])
+    print("arg[1]=", arg[1])
+end
+ndjawdhadw
+test();

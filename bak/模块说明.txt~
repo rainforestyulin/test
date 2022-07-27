@@ -1,0 +1,28 @@
+# 收包：
+    nas_nt_v1.3.cpp: data_read()->读取pcap文件的模块
+# 识别：
+    nas_nt_v1.3.cpp: head_op()->识别pcap文件头部信息、数据存放模式、文件版本等信息的模块
+    nas_nt_v1.3.cpp: data_partition()->识别pcap分帧信息，从pcap文件载入以太网帧的模块
+# 解析：
+    nas_nt_v1.3.cpp: [协议名称]_op()->识别各个协议字段并进行解析（例：TCP_op()为TCP协议解析模块，IPv4_op()为IP4协议解析模块）
+    nas_nt_v1.3.cpp: IP_analyzer()->分析网络流的模块
+    HTTP.h: 应用层协议HTTP的解析模块类
+    DNS.h:  应用层协议DNS的解析模块类
+    DHCP.h: 应用层协议DHCP的解析模块类
+    MQTT: 应用层协议MQTT的解析模块类
+# 输出：
+    nas_nt_v1.3.cpp: WriteMesgInfo()->以自定义格式写一个以太网帧解析结果的模块
+    nas_nt_v1.3.cpp: Flush_V5_FILE()->将所有网络流信息写入文件的模块
+# 展示：
+    nas_nt_v1.3.cpp: Usage()->输出提示信息的模块
+    nas_nt_v1.3.cpp: ProtoPrint()->打印系统支持协议的模块
+
+# 其他模块说明：
+    basic_data.h: 系统必要的数据结构模块
+    flow.h: 与流相关的数据结构模块
+    flowtree.h: 保存所有流的红黑树操作模块
+    int2char.cpp: 打印int型数据值的模块
+    rbtree.h: 红黑树数据结构模块
+
+
+
